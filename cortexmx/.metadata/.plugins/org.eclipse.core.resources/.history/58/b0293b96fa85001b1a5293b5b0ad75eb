@@ -1,0 +1,479 @@
+/*
+ * stm32f446xx_usart_driver.c
+ *
+ *  Created on: Mar 12, 2021
+ *      Author: Oliver
+ */
+
+#include "stm32f446xx_USART_driver.h"
+
+/*
+ *	UART (Universal Asynchronous Receiver Transmitter)
+ *	and
+ *	USART (Universal Synchronous/Asynchronous Receiver Transmitter)
+ *	are pieces of hardware that converts parallel data into serial data.
+ *
+ *	You can use USART module in both synchronous and asynchronous modes.
+ *
+ *	There is no specific port for USART communication. They are commonly used in conjunction
+ *	with protocols like RS-232, RS-434, USB etc.
+ *
+ *	In Synchronous transmission, the clock is sent separately from the data stream and
+ *	no start/stop bits are used.
+ *
+ *	USART Hardware Components:
+ *	Baud rate generator, TX and RX shift registers, Transmit/Receive control blocks and buffers,
+ *	First-in First-out (FIFO) buffer memory
+ *
+ *	USART is just a piece of hardware in the MCU which transmits/receives data bits either in
+ *	Synchronous or Asynchronous mode.
+ *
+ *	If it is Asynchronous mode, then the clock will not be sent alongside the data, instead we use
+ *	synchronization bits like start and stop with the useful data.
+ *
+ *	Understanding UART Pins:
+ *	UART1:  TX, RX, RTS, CTS
+ *
+ *	The USART RX engine continuously samples the RX line to detect the start bit of a frame.
+ *	When the start bit of the frame is detected, the frame reception kicks in on the RX line.
+ */
+
+#include "stm32f446xx_USART_driver.h"
+
+
+/******************* Private Helper Functions *******************/
+
+
+/* Peripheral Clock Setup */
+/* ******************************************************************************
+ * @fn					-  USART_PClockControl
+ *
+ * @brief				-  This function enables or disables the peripheral clock
+ * 						   for the given USART peripheral.
+ *
+ * @param[in]			-  Base address of the USART peripheral
+ * @param[in]			-  ENABLE or DISABLE macros
+ *
+ * @return				-  None
+ *
+ * @note				-  None
+ *
+ */
+void USART_PClockControl(USART_RegDef_t *pUSARTx, uint8_t State) {
+
+	//Enable peripheral clock for specified USART peripheral 1..3
+	if(State == ENABLE) {
+
+		if(pUSARTx == USART1) {
+			USART1_PCLK_EN();
+		} else if(pUSARTx == USART2) {
+			USART2_PCLK_EN();
+		} else if(pUSARTx == USART3) {
+			USART3_PCLK_EN();
+		}
+
+	//Disable peripheral clock for specified USART peripheral 1..3
+	} else {
+
+		if(pUSARTx == USART1) {
+			USART1_PCLK_DI();
+		} else if(pUSARTx == USART2) {
+			USART2_PCLK_DI();
+		} else if(pUSARTx == USART3) {
+			USART3_PCLK_DI();
+		}
+	}
+}
+
+
+/* Initialization and Deinitialization */
+/* ******************************************************************************
+ * @fn					-  USART_Init
+ *
+ * @brief				-  Initializes the USART peripheral
+ *
+ * @param[in]			-  Base address of the USART handle
+ *
+ * @return				-  None
+ *
+ * @note				-  None
+ *
+ */
+void USART_Init(USART_Handle_t *pUSARTHandle) {
+
+}
+
+/* ******************************************************************************
+ * @fn					-  USART_DeInit
+ *
+ * @brief				-  De-initializes the USART peripheral
+ *
+ * @param[in]			-  Base address of the USART peripheral
+ *
+ * @return				-  None
+ *
+ * @note				-  None
+ *
+ */
+void USART_DeInit(USART_RegDef_t *pUSARTx) {
+
+	if(pUSARTx == USART1) {
+		USART1_REG_RESET();
+	} else if(pUSARTx == USART2) {
+		USART2_REG_RESET();
+	} else if(pUSARTx == USART3) {
+		USART3_REG_RESET();
+	}
+}
+
+/* Data Send and Receive */
+/* ******************************************************************************
+ * @fn					-  USART_MasterSendData
+ *
+ * @brief				-  Send data over USART bus from master
+ *
+ * @param[in]			-  Pointer to base address of the USART Handle
+ * @param[in]			-  Pointer to Tx buffer
+ * @param[in]			-  Length of data to be sent
+ * @param[in]			-  Address of slave device
+ * @param[in]			-  USART_SR or USART_NO_SR macros (Repeated Start bits)
+ *
+ * @return				-  None
+ *
+ * @note				-  Polling based (blocking)
+ *
+ */
+void USART_MasterSendData(USART_Handle_t *pUSARTHandle, uint8_t *pTxBuffer, uint32_t Len, uint8_t SlaveAddress, uint8_t SR) {
+
+}
+
+/* ******************************************************************************
+ * @fn					-  USART_MasterReceiveData
+ *
+ * @brief				-  Receive data over USART bus from slave
+ *
+ * @param[in]			-  Pointer to base address of the USART Handle
+ * @param[in]			-  Pointer to Rx buffer
+ * @param[in]			-  Length of data to be read
+ * @param[in]			-  Address of slave device
+ * @param[in]			-  USART_SR or USART_NO_SR macros (Repeated Start bits)
+ *
+ * @return				-  None
+ *
+ * @note				-  Polling based (blocking)
+ *
+ */
+void USART_MasterReceiveData(USART_Handle_t *pUSARTHandle, uint8_t *pRxBuffer, uint8_t Len, uint8_t SlaveAddress, uint8_t SR) {
+
+}
+
+/* ******************************************************************************
+ * @fn					-  USART_MasterSendDataIT
+ *
+ * @brief				-  Send data over USART bus from master (IT)
+ *
+ * @param[in]			-  Pointer to base address of the USART Handle
+ * @param[in]			-  Pointer to Rx buffer
+ * @param[in]			-  Length of data to be read
+ * @param[in]			-  Address of slave device
+ * @param[in]			-  USART_SR or USART_NO_SR macros (Repeated Start bits)
+ *
+ * @return				-  Busy state
+ *
+ * @note				-  Interrupt based (non-blocking)
+ *
+ */
+uint8_t USART_MasterSendDataIT(USART_Handle_t *pUSARTHandle, uint8_t *pTxBuffer, uint32_t Len, uint8_t SlaveAddress, uint8_t SR) {
+
+}
+
+/* ******************************************************************************
+ * @fn					-  USART_MasterReceiveDataIT
+ *
+ * @brief				-  Receive data over USART bus from slave (IT)
+ *
+ * @param[in]			-  Pointer to base address of the USART Handle
+ * @param[in]			-  Pointer to Rx buffer
+ * @param[in]			-  Length of data to be read
+ * @param[in]			-  Address of slave device
+ * @param[in]			-  USART_SR or USART_NO_SR macros (Repeated Start bits)
+ *
+ * @return				-  Busy state
+ *
+ * @note				-  Interrupt based (non-blocking)
+ *
+ */
+uint8_t USART_MasterReceiveDataIT(USART_Handle_t *pUSARTHandle, uint8_t *pRxBuffer, uint8_t Len, uint8_t SlaveAddress, uint8_t SR) {
+
+}
+
+/* ******************************************************************************
+ * @fn					-  USART_CloseTransmission
+ *
+ * @brief				-  End USART transmission
+ *
+ * @param[in]			-  Pointer to USART handle
+ *
+ * @return				-  None
+ *
+ * @note				-  None
+ *
+ */
+void USART_CloseTransmission(USART_Handle_t *pUSARTHandle) {
+
+}
+
+/* ******************************************************************************
+ * @fn					-  USART_CloseReception
+ *
+ * @brief				-  End USART reception
+ *
+ * @param[in]			-  Pointer to USART handle
+ *
+ * @return				-  None
+ *
+ * @note				-  None
+ *
+ */
+void USART_CloseReception(USART_Handle_t *pUSARTHandle) {
+
+}
+
+/* ******************************************************************************
+ * @fn					-  USART_SlaveSendData
+ *
+ * @brief				-  Send data over USART bus from slave
+ *
+ * @param[in]			-  Base address of the USART peripheral
+ * @param[in]			-  Data byte to be sent
+ *
+ * @return				-  None
+ *
+ * @note				-  None
+ *
+ */
+void USART_SlaveSendData(USART_RegDef_t *pUSARTx, uint8_t data) {
+
+}
+
+/* ******************************************************************************
+ * @fn					-  USART_SlaveReceiveData
+ *
+ * @brief				-  Receive data over USART bus from master
+ *
+ * @param[in]			-  Base address of the USART peripheral
+ *
+ * @return				-  Data byte received
+ *
+ * @note				-  None
+ *
+ */
+uint8_t USART_SlaveReceiveData(USART_RegDef_t *pUSARTx) {
+
+}
+
+/* IRQ Configuration, Priority and ISR Handling */
+/* ******************************************************************************
+ * @fn					-  USART_IRQInterruptConfig
+ *
+ * @brief				-  Configure interrupt request (IRQx)
+ *
+ * @param[in]			-  IRQ number
+ * @param[in]			-  ENABLE or DISABLE macros
+ *
+ * @return				-  None
+ *
+ * @note				-  None
+ *
+ */
+void USART_IRQInterruptConfig(uint8_t IRQNumber, uint8_t State) {
+
+	if(State == ENABLE) {
+
+		if(IRQNumber <= 31) { //IRQ 0 to 31
+			//program ISER0 register
+			*NVIC_ISER0 |= (1 << IRQNumber);
+
+		} else if(IRQNumber > 31 && IRQNumber < 64) { //IRQ 32 to 63
+			//program ISER1 register
+			*NVIC_ISER1 |= (1 << (IRQNumber % 32));
+
+		} else if(IRQNumber >= 64 && IRQNumber < 96) { //IRQ 64 to 95
+			//program ISER2 register
+			*NVIC_ISER2 |= (1 << (IRQNumber % 64));
+
+		} else if(IRQNumber >= 96 && IRQNumber < 128) { //IRQ 96 to 127 (stm32f446xx only supports up to IRQ96)
+			//program ISER3 register
+			*NVIC_ISER3 |= (1 << (IRQNumber % 96));
+		}
+
+	} else {
+
+		if(IRQNumber <= 31) { //0 to 31
+			//program ICER0 register
+			*NVIC_ICER0 |= (1 << IRQNumber);
+
+		} else if(IRQNumber > 31 && IRQNumber < 64) { //IRQ 32 to 63
+			//program ICER1 register
+			*NVIC_ICER1 |= (1 << (IRQNumber % 32));
+
+		} else if(IRQNumber >= 64 && IRQNumber < 96) { //IRQ 64 to 95
+			//program ICER2 register
+			*NVIC_ICER2 |= (1 << (IRQNumber % 64));
+
+		} else if(IRQNumber >= 96 && IRQNumber < 128) { //IRQ 96 to 127 (stm32f446xx only supports up to IRQ96)
+			//program ICER3 register
+			*NVIC_ICER3 |= (1 << (IRQNumber % 96));
+		}
+	}
+}
+
+/* ******************************************************************************
+ * @fn					-  USART_IRQPriorityConfig
+ *
+ * @brief				-  Configure IRQ priority
+ *
+ * @param[in]			-  IRQ number
+ * @param[in]			-  IRQ priority
+ *
+ * @return				-  None
+ *
+ * @note				-  None
+ *
+ */
+void USART_IRQPriorityConfig(uint8_t IRQNumber, uint32_t IRQPriority) {
+
+	//1. First calculate for the correct IPR register
+	//IPRx registers are 32 bits wide, split into four sections of 1 Byte (8-bits): | IPRn || IRQ4n+3_PRI | IRQ4n+2_PRI | IRQ4n+1_PRI | IRQ4n_PRI |
+	uint8_t iprx = (IRQNumber / 4);
+	uint8_t iprx_section = (IRQNumber % 4);
+
+	//Within each 8-bit (byte) IRQ4n_PRI field, only the upper 4 bits are implemented (4:7), while the lower 4 are not (0:3).
+	uint8_t shift_amount = (8 * iprx_section) + (8 - NO_PR_BITS_IMPLEMENTED);
+
+	*(NVIC_PR_BASE_ADDR + iprx) |= (IRQPriority << shift_amount);
+}
+
+/* ******************************************************************************
+ * @fn					-  USART_EV_IRQHandling
+ *
+ * @brief				-  Configure USART Event IRQ Handling
+ *
+ * @param[in]			-  Pointer to base address of the USART Handle
+ *
+ * @return				-  None
+ *
+ * @note				-  None
+ *
+ */
+void USART_EV_IRQHandling(USART_Handle_t *pUSARTHandle) {
+
+}
+
+/* ******************************************************************************
+ * @fn					-  USART_ER_IRQHandling
+ *
+ * @brief				-  Configure USART Error IRQ Handling
+ *
+ * @param[in]			-  Pointer to base address of the USART Handle
+ *
+ * @return				-  None
+ *
+ * @note				-  None
+ *
+ */
+void USART_ER_IRQHandling(USART_Handle_t *pUSARTHandle) {
+
+}
+
+/* Other Peripheral Control APIs */
+/* ******************************************************************************
+ * @fn					-  USART_PeripheralControl
+ *
+ * @brief				-  Enable or disable USARTx peripheral
+ *
+ * @param[in]			-  Base address of the USART peripheral
+ * @param[in]			-  ENABLE or DISABLE macros
+ *
+ * @return				-  None
+ *
+ * @note				-  None
+ *
+ */
+void USART_PeripheralControl(USART_RegDef_t *pUSARTx, uint8_t State) {
+
+
+}
+
+/* ******************************************************************************
+ * @fn					-  USART_GetFlagStatus
+ *
+ * @brief				-  Retrieve flag status of USART peripheral
+ *
+ * @param[in]			-  Base address of the USART peripheral
+ * @param[in]			-  Flag name
+ *
+ * @return				-  Byte containing flag status info
+ *
+ * @note				-  None
+ *
+ */
+uint8_t USART_GetFlagStatus(USART_RegDef_t *pUSARTx, uint32_t FlagName) {
+
+
+}
+
+/* ******************************************************************************
+ * @fn					-  USART_ManageAcking
+ *
+ * @brief				-  Enable or Disable ACKing
+ *
+ * @param[in]			-  Base address of the USART peripheral
+ * @param[in]			-  USART_ACK_ENABLE or USART_ACK_DISABLE macros
+ *
+ * @return				-  None
+ *
+ * @note				-  None
+ *
+ */
+void USART_ManageAcking(USART_RegDef_t *pUSARTx, uint8_t State) {
+
+}
+
+/* ******************************************************************************
+ * @fn					-  USART_GenerateStopCondition
+ *
+ * @brief				-  Generate STOP condition for USART bus
+ *
+ * @param[in]			-  Base address of the USART peripheral
+ *
+ * @return				-  None
+ *
+ * @note				-  None
+ *
+ */
+void USART_GenerateStopCondition(USART_RegDef_t *pUSARTx) {
+
+
+}
+
+
+/* Application Callback */
+/* ******************************************************************************
+ * @fn					-  USART_ApplicationEventCallback
+ *
+ * @brief				-  Application Event Callback (weak implementation)
+ *
+ * @param[in]			-  Pointer to USART handle
+ * @param[in]			-  Application event byte
+ *
+ * @return				-  None
+ *
+ * @note				-  Weak implementation
+ *
+ */
+__weak void USART_ApplicationEventCallback(USART_Handle_t *pUSARTHandle, uint8_t AppEv) {
+
+	//This is a weak implementation -- the application may override this function.
+}
+

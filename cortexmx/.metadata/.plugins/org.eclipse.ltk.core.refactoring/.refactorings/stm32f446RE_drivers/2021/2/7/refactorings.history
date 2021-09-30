@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Rename resource &apos;stm32f446RE_drivers/Src/005spi_txonly_arduino&apos; to &apos;005spi_txonly_arduino.c&apos;" description="Rename resource &apos;005spi_txonly_arduino&apos;" flags="7" id="org.eclipse.ltk.core.refactoring.rename.resource" input="Src/005spi_txonly_arduino" name="005spi_txonly_arduino.c" stamp="1612921187482" updateReferences="true"/>
+</session>

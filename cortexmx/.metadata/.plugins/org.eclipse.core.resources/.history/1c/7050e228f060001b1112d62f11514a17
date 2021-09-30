@@ -1,0 +1,190 @@
+/*
+ * stm32f446xx_gpio_driver.c
+ *
+ *  Created on: Jan 24, 2021
+ *      Author: Oliver
+ */
+
+#include "stm32f446xx_gpio_driver.h"
+
+
+/* Peripheral Clock Setup */
+/* ******************************************************************************
+ * @fn					-  GPIO_PClockControl
+ *
+ * @brief				-  This function enables or disables the peripheral clock
+ * 						   for the given GPIO port.
+ *
+ * @param[in]			-  Base address of the GPIO peripheral
+ * @param[in]			-  ENABLE or DISABLE macros
+ *
+ * @return				-  none
+ *
+ * @Note				-  none
+ *
+ */
+void GPIO_PClockControl(GPIO_RegDef_t *pGPIOx, uint8_t State) {
+
+	if(State == ENABLE) {
+
+	} else {
+
+	}
+}
+
+
+/* Initialize and Deinitialize */
+/* ******************************************************************************
+ * @fn					-  GPIO_Init
+ *
+ * @brief				-  Initializes GPIO peripheral
+ *
+ * @param[in]			-  Base address of the GPIO Handle
+ *
+ * @return				-  none
+ *
+ * @Note				-  none
+ *
+ */
+void GPIO_Init(GPIO_Handle_t *pGPIOHandle) {
+
+}
+
+/* ******************************************************************************
+ * @fn					-  GPIO_DeInit
+ *
+ * @brief				-  Deinitializes GPIO peripheral
+ *
+ * @param[in]			-  Base address of the GPIO peripheral
+ *
+ * @return				-  none
+ *
+ * @Note				-  none
+ *
+ */
+void GPIO_DeInit(GPIO_RegDef_t *pGPIOx) {
+
+}
+
+
+/* Data Read and Write */
+/* ******************************************************************************
+ * @fn					-  GPIO_ReadFromInputPin
+ *
+ * @brief				-  Read from Input GPIO Pin
+ *
+ * @param[in]			-  Base address of the GPIO peripheral
+ * @param[in]			-  GPIOx Pin Number
+ *
+ * @return				-  Byte read from GPIOx pin
+ *
+ * @Note				-  none
+ *
+ */
+uint8_t GPIO_ReadFromInputPin(GPIO_RegDef_t *pGPIOx, uint8_t PinNumber) {
+
+}
+
+/* ******************************************************************************
+ * @fn					-  GPIO_ReadFromInputPort
+ *
+ * @brief				-  Read from Input GPIO Port
+ *
+ * @param[in]			-  Base address of the GPIO peripheral
+ *
+ * @return				-  Word (16-bit) read from GPIOx port
+ *
+ * @Note				-  none
+ *
+ */
+uint16_t GPIO_ReadFromInputPort(GPIO_RegDef_t *pGPIOx) {
+
+}
+
+/* ******************************************************************************
+ * @fn					-  GPIO_WriteToOutputPin
+ *
+ * @brief				-  Write to Output GPIO Pin
+ *
+ * @param[in]			-  Base address of the GPIO peripheral
+ * @param[in]			-  GPIOx Pin Number
+ * @param[in]			-  SET or RESET macros
+ *
+ * @return				-  none
+ *
+ * @Note				-  none
+ *
+ */
+void GPIO_WriteToOutputPin(GPIO_RegDef_t *pGPIOx, uint8_t PinNumber, uint8_t Value) {
+
+}
+
+/* ******************************************************************************
+ * @fn					-  GPIO_WriteToOutputPort
+ *
+ * @brief				-  Write to Output GPIO Port
+ *
+ * @param[in]			-  Base address of the GPIO peripheral
+ * @param[in]			-  16-bit Value
+ *
+ * @return				-  none
+ *
+ * @Note				-  none
+ *
+ */
+void GPIO_WriteToOutputPort(GPIO_RegDef_t *pGPIOx, uint16_t Value) {
+
+}
+
+/* ******************************************************************************
+ * @fn					-  GPIO_ToggleOutputPin
+ *
+ * @brief				-  Toggle Output GPIO Pin
+ *
+ * @param[in]			-  Base address of the GPIO peripheral
+ * @param[in]			-  GPIOx Pin Number
+ *
+ * @return				-  none
+ *
+ * @Note				-  none
+ *
+ */
+void GPIO_ToggleOutputPin(GPIO_RegDef_t *pGPIOx, uint8_t PinNumber) {
+
+}
+
+
+/* IRQ Configuration and ISR Handling */
+/* ******************************************************************************
+ * @fn					-  GPIO_IRQConfig
+ *
+ * @brief				-  Configure Interrupt Request (IRQx)
+ *
+ * @param[in]			-  IRQ Number
+ * @param[in]			-  IRQ Priority
+ * @param[in]			-  ENABLE or DISABLE macros
+ *
+ * @return				-  none
+ *
+ * @Note				-  none
+ *
+ */
+void GPIO_IRQConfig(uint8_t IRQNumber, uint8_t IRQPriority, uint8_t state) {
+
+}
+
+/* ******************************************************************************
+ * @fn					-  GPIO_IRQHandling
+ *
+ * @brief				-  Configure IRQ Handler for GPIOx PINy
+ *
+ * @param[in]			-  GPIOx Pin Number
+ *
+ * @return				-  none
+ *
+ * @Note				-  none
+ *
+ */
+void GPIO_IRQHandling(uint8_t PinNumber) {
+
+}

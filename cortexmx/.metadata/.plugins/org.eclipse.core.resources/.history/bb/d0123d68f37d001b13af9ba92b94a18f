@@ -1,0 +1,408 @@
+/*
+ * stm32f446xx_i2c_driver.c
+ *
+ *  Created on: Feb 19, 2021
+ *      Author: Oliver
+ */
+
+/*
+ * What is I2C?
+ *
+ * I2C is a protocol to achieve serial data communication between integrated circuits (ICs) which are very close to each other. It is a more serious
+ * protocol than I2C because companies have come forward to design a specification for it.
+ *
+ * I2C protocol details (how data should be sent/received, how hand shaking should happen between sender and receiver, error handling) are more complex
+ * than I2C.
+ *
+ * There is no dedicated spec for I2C but TI and Motorola have their own specs. I2C is based on a dedicated spec.
+ *
+ * I2C is multi-master capable, whereas I2C has no guidelines to achieve this, but depends on MCU designers. STM I2C peripherals can be used in multi-
+ * master configurations but arbitration should be handled by software code.
+ *
+ * I2C hardware automatically ACKs every byte received. I2C does not support any automatic ACKing.
+ *
+ * I2C needs only 2 pins for communication while I2C may need 4 pins and even more if multiple slaves are involved.
+ *
+ * I2C master talks to slaves based on slave addresses, whereas I2C uses dedicated pins to select the slave.
+ *
+ * I2C is half duplex, while I2C is full duplex.
+ *
+ * For I2C, the max speed is 4MHz in ultra speed plus. For some STM microcontrollers, the max speed is just 400kHz. For I2C max speed, its Fpclk/2.
+ * That means if the peripheral clock is 20MHz, then speed can be 10MHz.
+ *
+ * Slaves Control over Serial Clock:
+ * In I2C, slave can make master wait by holding the clock down if its busy, thanks to clock stretching feature of I2C. But in I2C, slave has no control
+ * over the clock, programmers may use their own tricks to overcome this situation.
+ *
+ * Data Rate:
+ * Data Rate (number of bits transferred from sender to receiver in 1 sec) is much less compared to I2C.
+ *
+ * For example, in STM32F4x, if you have a peripheral clock of 40MHz, then with I2C you can only achieve data rate of 400Kbps compared with 20Mbps for I2C.
+ *
+ * SDA and SCL Signals:
+ * Both SDA and SCL are bidirectional lines connected to a positive supply voltage via pullup resistors. When the bus is free, both lines are held high.
+ * The output stages of devices connected to the bus must have an open-drain or open-collector configuration.
+ * The bus capacitance limits the number of interfaces connected to the bus.
+ *
+ * I2C Modes:
+ * Standard Mode		Up to 100Kbits/sec		Supported by STM32F4x
+ * Fast Mode			Up to 400Kbits/sec		Supported by STM32F4x
+ * Fast Mode+			Up to 1Mbits/sec		Supported by Some STM32F4x MCUs
+ * High Speed Mode		Up to 3.4Mbits/sec		(not supported by F4x)
+ *
+ *	Start & Stop Conditions:
+ *	All transactions begin with a Start(S) and are terminated by a STOP(P)
+ *	A High to Low transition on the SDA line while SCL is High defines a Start condition
+ *	A Low to High transition on the SDA line while SCL is High defines a Stop condition
+ *
+ *	The bus is considered to be busy after the START condition.
+ *	The bus is considered to be free again a certain time after the STOP condition.
+ *	When the bus is free another master (if present) may claim the bus.
+ *	The bus stays busy if a repeated START is generated instead of a STOP condition.
+ *	Most of the MCUs I2C peripherals support both master and slave mode. You need not to configure the mode because when the peripheral generates the
+ *	start condition it automatically becomes the master and when it generates the stop condition it goes back to slave mode.
+ *
+ *	When Master gives ACK to slave, it means its ready to accept additional bytes. When Master sends NACK to slave, it indicates to slave to stop transmitting data.
+ *
+ *	Repeated Start Condition: (Sr) Start Again without Stop
+ *	A master would do this to prevent another master from taking over the bus if it hasn't finished all communication.
+ *	It is essentially a START, STOP, START without giving the chance for another master to take over in between those START conditions.
+ *
+ *	I2C1, I2C2, I2C3 are all on APB1 bus.
+ *
+ *	Required APIs:
+ *	I2C Initialization
+ *	I2C Master TX
+ *	I2C Master RX
+ *	I2C Slave TX
+ *	I2C Slave RX
+ *	I2C Error Interrupt Handling
+ *	I2C Event Interrupt Handling
+ *
+ *	I2Cx Peripheral:
+ *	I2C_SCLSpeed
+ *	I2C_DeviceAddress
+ *	I2C_ACKControl
+ *	I2C_FMDutyCycle
+ *
+ *	Steps for I2C Init (Generic)
+ *	1. Configure the Mode (standard or fast)
+ *	2. Configure the speed of the serial clock (SCL)
+ *	3. Configure the device address (applicable when device is slave)
+ *	4. Enable the Acking
+ *	5. Configure the rise time for I2C pins
+ *
+ *
+ *	I2C Clock Stretching:
+ *
+ *	. Clock stretching simply means holding the clock to 0 or ground level.
+ *	. The moment clock is held low, then the whole I2C interface pauses until clock is given up to its normal operation level.
+ *	. I2C Devices, either master or slave, use clock stretching to slow down the communication by stretching SCL to low,
+ *	  which prevents the clock to rise high again and the i2c communication stops for awhile.
+ *		. There are situations where an I2C slave is not able to cooperate with the clock speed given by the master and needs to slow down a little.
+ *		. If slave needs time, then it takes the advantage of clock stretching, and by holding clock at low, it pauses I2C operation.
+ */
+
+#include "stm32f446xx_i2c_driver.h"
+
+uint16_t AHB_PreScaler[8] = {2,4,8,16,64,128,256,512};
+uint16_t APB1_PreScaler[4] = {2,4,8,16};
+
+static void I2C_GenerateStartCondition(I2C_RegDef_t *pI2Cx);
+static void I2C_ExecuteAddressPhase(I2C_RegDef_t *pI2Cx, uint8_t SlaveAddr);
+static void I2C_ClearADDRFlag(I2C_RegDef_t *pI2Cx);
+static void I2C_GenerateStopCondition(I2C_RegDef_t *pI2Cx);
+
+/******************* Private Helper Functions *******************/
+static void I2C_GenerateStartCondition(I2C_RegDef_t *pI2Cx) {
+
+	pI2Cx->CR1 |= (1 << I2C_CR1_START);
+}
+
+static void I2C_ExecuteAddressPhase(I2C_RegDef_t *pI2Cx, uint8_t SlaveAddr) {
+
+	SlaveAddr = SlaveAddr << 1;
+	SlaveAddr &= ~(1); // the lsb is R/nW bit which must be set to 0 for WRITE
+	pI2Cx->DR = SlaveAddr;
+}
+
+static void I2C_ClearADDRFlag(I2C_RegDef_t *pI2Cx) {
+
+	uint32_t dummyRead;
+	dummyRead = pI2Cx->SR1;
+	dummyRead = pI2Cx->SR2;
+	(void)dummyRead;
+}
+
+static void I2C_GenerateStopCondition(I2C_RegDef_t *pI2Cx) {
+
+	pI2Cx->CR1 |= (1 << I2C_CR1_STOP);
+}
+
+/* Peripheral Clock Setup */
+/* ******************************************************************************
+ * @fn					-  I2C_PClockControl
+ *
+ * @brief				-  This function enables or disables the peripheral clock
+ * 						   for the given I2C peripheral.
+ *
+ * @param[in]			-  Base address of the I2C peripheral
+ * @param[in]			-  ENABLE or DISABLE macros
+ *
+ * @return				-  None
+ *
+ * @note				-  None
+ *
+ */
+void I2C_PClockControl(I2C_RegDef_t *pI2Cx, uint8_t State) {
+
+	//Enable peripheral clock for specified I2C peripheral 1..3
+	if(State == ENABLE) {
+
+		if(pI2Cx == I2C1) {
+			I2C1_PCLK_EN();
+		} else if(pI2Cx == I2C2) {
+			I2C2_PCLK_EN();
+		} else if(pI2Cx == I2C3) {
+			I2C3_PCLK_EN();
+		}
+
+	//Disable peripheral clock for specified I2C peripheral 1..3
+	} else {
+
+		if(pI2Cx == I2C1) {
+			I2C1_PCLK_DI();
+		} else if(pI2Cx == I2C2) {
+			I2C2_PCLK_DI();
+		} else if(pI2Cx == I2C3) {
+			I2C3_PCLK_DI();
+		}
+	}
+}
+
+uint32_t RCC_GetPLLOutputClock(void) {
+
+	return 0;
+}
+
+uint32_t RCC_GetPCLK1Value(void) {
+
+	uint32_t pclk1, SystemClk;
+	uint8_t clksrc, temp, ahbp, apb1p;
+
+	clksrc = ((RCC->CFGR >> 2) & 0x3);
+
+	if(clksrc == 0) {
+		SystemClk = 16000000;
+	} else if(clksrc == 1) {
+		SystemClk = 8000000;
+	} else if(clksrc == 2) {
+		SystemClk = RCC_GetPLLOutputClock();
+	}
+
+	//for AHB
+	temp = ((RCC->CFGR >> 4) & 0xF);
+
+	if(temp < 8) {
+		ahbp = 1;
+	} else {
+		ahbp = AHB_PreScaler[temp - 8];
+	}
+
+	//for APB1
+	temp = ((RCC->CFGR >> 10) & 0x7);
+
+	if(temp < 4) {
+		apb1p = 1;
+	} else {
+		ahbp = APB1_PreScaler[temp - 4];
+	}
+
+	pclk1 = ((SystemClk / ahbp) / apb1p);
+
+	return pclk1;
+}
+
+/* Initialization and Deinitialization */
+/* ******************************************************************************
+ * @fn					-  I2C_Init
+ *
+ * @brief				-  Initializes the I2C peripheral
+ *
+ * @param[in]			-  Base address of the I2C handle
+ *
+ * @return				-  None
+ *
+ * @note				-  None
+ *
+ */
+void I2C_Init(I2C_Handle_t *pI2CHandle) {
+
+	uint32_t tempreg = 0;
+
+	//1. ack control bit
+	tempreg |= pI2CHandle->I2C_Config.I2C_AckControl << 10;
+	pI2CHandle->pI2Cx->CR1 = tempreg;
+
+	//2. configure the FREQ field of CR2
+	tempreg = 0;
+	tempreg |= (RCC_GetPCLK1Value() / 1000000U);
+	pI2CHandle->pI2Cx->CR2 = (tempreg & 0x3F); //mask all bits except the first 5 bits
+
+	//3. program the device's own address (helpful if device is slave)
+	tempreg |= pI2CHandle->I2C_Config.I2C_DeviceAddress << 1;
+	tempreg |= (1 << 14);
+	pI2CHandle->pI2Cx->OAR1 = tempreg;
+
+	//4. CCR calculations
+	uint16_t ccr_value = 0;
+	tempreg = 0;
+
+	if(pI2CHandle->I2C_Config.I2C_SCLSpeed <= I2C_SCL_Speed_SM) {
+		//standard mode
+		ccr_value = (RCC_GetPCLK1Value() / (2 * pI2CHandle->I2C_Config.I2C_SCLSpeed)); //50% duty cycle
+		tempreg |= (ccr_value & 0xFFF); //mask all bits except the first 12 bits
+	} else {
+		//fast mode
+		tempreg |= (1 << 15);
+		tempreg |= (pI2CHandle->I2C_Config.I2C_FMDutyCycle << 14);
+		if(pI2CHandle->I2C_Config.I2C_FMDutyCycle == I2C_FM_DUTY_2) {
+			ccr_value = (RCC_GetPCLK1Value() / (3 * pI2CHandle->I2C_Config.I2C_SCLSpeed)); //DUTY = 0
+		} else {
+			ccr_value = (RCC_GetPCLK1Value() / (25 * pI2CHandle->I2C_Config.I2C_SCLSpeed)); //DUTY = 1
+		}
+		tempreg |= (ccr_value & 0xFFF); //mask all bits except the first 12 bits
+	}
+	pI2CHandle->pI2Cx->CCR = tempreg;
+
+	//5. TRISE
+
+}
+
+/* ******************************************************************************
+ * @fn					-  I2C_DeInit
+ *
+ * @brief				-  De-initializes the I2C peripheral
+ *
+ * @param[in]			-  Base address of the I2C peripheral
+ *
+ * @return				-  None
+ *
+ * @note				-  None
+ *
+ */
+void I2C_DeInit(I2C_RegDef_t *pI2Cx) {
+
+	if(pI2Cx == I2C1) {
+		I2C1_REG_RESET();
+	} else if(pI2Cx == I2C2) {
+		I2C2_REG_RESET();
+	} else if(pI2Cx == I2C3) {
+		I2C3_REG_RESET();
+	}
+}
+
+/* Data Send and Receive */
+/* ******************************************************************************
+ * @fn					-  I2C_MasterSendData
+ *
+ * @brief				-  Send data over I2C bus from master
+ *
+ * @param[in]			-  Pointer to base address of the I2C Handle
+ * @param[in]			-  Pointer to Tx buffer
+ * @param[in]			-  Length of data to be sent
+ * @param[in]			-  Address of slave device
+ *
+ * @return				-  None
+ *
+ * @note				-  None
+ *
+ */
+void I2C_MasterSendData(I2C_Handle_t *pI2CHandle, uint8_t *pTxBuffer, uint32_t Len, uint8_t SlaveAddress) {
+
+	//1. Generate the START condition
+	I2C_GenerateStartCondition(pI2CHandle->pI2Cx);
+
+	//2. Confirm that start generation is completed by checking the SB flag in SR1
+	//	 Note: Until SB is cleared, SCL will be stretched (pulled to LOW)
+	while(!I2C_GetFlagStatus(pI2CHandle->pI2Cx, I2C_FLAG_SB));
+
+	//3. Send the address of the slave with r/nw bit set to w(0) (total 8 bits)
+	I2C_ExecuteAddressPhase(pI2CHandle->pI2Cx, SlaveAddress);
+
+	//4. Confirm that address phase is completed by checking the ADDR flag in the SR1
+	while(!I2C_GetFlagStatus(pI2CHandle->pI2Cx, I2C_FLAG_ADDR));
+
+	//5. Clear the ADDR flag according to its software sequence
+	//	 Note: Until ADDR is cleared, SCL will be stretched (pulled to LOW)
+	I2C_ClearADDRFlag(pI2CHandle->pI2Cx);
+
+	//6. Send the data until Len becomes 0
+	while(Len > 0) {
+		while(!I2C_GetFlagStatus(pI2CHandle->pI2Cx,I2C_FLAG_TXE)); //wait until TXE is set
+		pI2CHandle->pI2Cx->DR = *pTxBuffer;
+		pTxBuffer++;
+		Len--;
+	}
+
+	//7. When Len becomes zero, wait for TXE=1 and BTF=1 before generating the STOP condition
+	//   Note: TXE=1, BTF=1, means that both SR and DR are empty and next transmission should begin
+	//   when BTF=1, SCL will be stretched (pulled to LOW)
+	while(!I2C_GetFlagStatus(pI2CHandle->pI2Cx,I2C_FLAG_TXE)); //wait until TXE is set
+	while(!I2C_GetFlagStatus(pI2CHandle->pI2Cx,I2C_FLAG_BTF)); //wait until BTF is set
+
+	//8. Generate STOP condition and master need not to wait for the completion of stop condition.
+	//	 Note: generating STOP, automatically clears the BTF.
+	I2C_GenerateStopCondition(pI2CHandle->pI2Cx);
+}
+
+
+/* Other Peripheral Control APIs */
+/* ******************************************************************************
+ * @fn					-  I2C_PeripheralControl
+ *
+ * @brief				-  Enable or disable I2Cx peripheral
+ *
+ * @param[in]			-  Base address of the I2C peripheral
+ * @param[in]			-  ENABLE or DISABLE macros
+ *
+ * @return				-  None
+ *
+ * @note				-  None
+ *
+ */
+void I2C_PeripheralControl(I2C_RegDef_t *pI2Cx, uint8_t State) {
+
+	if(State == ENABLE) {
+ 		pI2Cx->CR1 |= (1 << I2C_CR1_PE);
+ 		//pI2CBaseAddress->CR1 |= I2C_CR1_PE_Bit_Mask;
+ 	} else {
+ 		pI2Cx->CR1 &= ~(1 << 0);
+	}
+}
+
+/* ******************************************************************************
+ * @fn					-  I2C_GetFlagStatus
+ *
+ * @brief				-  Retrieve flag status of I2C peripheral
+ *
+ * @param[in]			-  Base address of the I2C peripheral
+ * @param[in]			-  Flag name
+ *
+ * @return				-  Byte containing flag status info
+ *
+ * @note				-  None
+ *
+ */
+uint8_t I2C_GetFlagStatus(I2C_RegDef_t *pI2Cx, uint32_t FlagName) {
+
+	if(pI2Cx->SR1 & FlagName) {
+		return FLAG_SET;
+	}
+
+	return FLAG_RESET;
+}
+
+
+
+

@@ -1,0 +1,11 @@
+ds1307.c:17:13:ds1307_i2c_pin_config	32	static
+ds1307.c:50:13:ds1307_i2c_config	8	static
+ds1307.c:59:13:ds1307_write	32	static
+ds1307.c:69:16:ds1307_read	32	static
+ds1307.c:79:16:binary_to_bcd	24	static
+ds1307.c:94:16:bcd_to_binary	24	static
+ds1307.c:106:9:ds1307_init	16	static
+ds1307.c:127:6:ds1307_set_current_time	24	static
+ds1307.c:149:6:ds1307_set_current_date	16	static
+ds1307.c:157:6:ds1307_get_current_time	24	static
+ds1307.c:181:6:ds1307_get_current_date	16	static

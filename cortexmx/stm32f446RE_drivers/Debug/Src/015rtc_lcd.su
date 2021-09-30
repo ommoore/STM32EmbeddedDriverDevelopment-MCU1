@@ -1,0 +1,8 @@
+015rtc_lcd.c:40:6:init_systick_timer	32	static
+015rtc_lcd.c:63:7:get_day_of_week	56	static
+015rtc_lcd.c:70:6:number_to_string	16	static
+015rtc_lcd.c:83:7:time_to_string	16	static
+015rtc_lcd.c:100:7:date_to_string	16	static
+015rtc_lcd.c:117:13:mdelay	24	static
+015rtc_lcd.c:122:5:main	24	static
+015rtc_lcd.c:198:6:SysTick_Handler	24	static

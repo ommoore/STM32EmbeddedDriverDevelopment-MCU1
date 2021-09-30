@@ -1,0 +1,24 @@
+/*
+ * 001LedToggle.c
+ *
+ *  Created on: Jan 29, 2021
+ *      Author: Oliver
+ */
+
+/*
+ * 	Exercise:
+ *	Write a program to toggle the on board LED with some delay.
+ *	Case 1: Use push pull configuration for the output pin
+ *	Case 2: Use open drain configuration for the output pin
+ */
+
+#include "stm32f446xx.h"
+
+int main(void)
+{
+	GPIO_Handle_t GPIOLed;
+
+	GPIOLed.pGPIOx = GPIOD;
+
+	return 0;
+}

@@ -1,0 +1,543 @@
+/*
+ * stm32f446xx_spi_driver.c
+ *
+ *  Created on: Feb 5, 2021
+ *      Author: Oliver
+ */
+
+/*	Notes:
+ *
+ * 				Serial Peripheral Interface
+ *
+ * 	The SPI bus allows the communication between one master device and one or more slave devices:
+ *
+ * 				SCLK -----------------> SCLK
+ * 	Master		MOSI -----------------> MOSI		Slave
+ * 				MISO <----------------- MISO	(Sensor, EEPROM, SDCARD,
+ * 				gpio1-----------------> šš		 Display, Bluetooth, etc)
+ *
+ *	Serial Clock, Master Out Slave In, Master In Slave Out, Slave Select.
+ *
+ *	1. Four I/O pins are dedicated to SPI communication with external devices.
+ *	2. MISO: Master In / Slave Out data. In the general case, this pin is used to transmit data
+ *	   in slave mode and receive data in master mode.
+ *	3. MOSI: Master Out / Slave In data. In general case, this pin is used to transmit data
+ *	   in master mode, and receive data in slave mode.
+ *	4. SCK: Serial Clock output pin for SPI master and input pin for SPI slaves.
+ *	5. NSS: Slave select pin. Depending on the SPI and NSS settings, this pin can be
+ *	   used to select an individual slave device for communication.
+ *
+ *
+ *	SPI advantages:  higher speed than I2C, simpler
+ *		disadvantages: low distance (10ft), more pins used.
+ *
+ *	RS-485 (4000ft max distance)
+ *
+ *	SPI/I2C communicate over TTL signaling in range of 0-5V.
+ *	CAN/RS-485 communicate over differential signaling (>10V).
+ *	This is a reason why SPI and I2C are short distance communication interfaces.
+ *
+ *
+ *	Protocol	Type					Max Distance (ft)				Max Speed (bps)			Typical Usage
+ *	USB3.0		Dual Simplex Serial		9ft (up to 49 with 5 hubs)   	5G						Mass storage, video
+ *	USB2.0		Half Duplex Serial		16ft (98ft with 5 hubs)			1.5M,12M,480M			Keyboard, Mouse, Drive, speakers, printer, camera
+ *	Ethernet	Serial					1600ft							10G						Network Communications
+ *	I2C			Synchronous Serial		18ft							3.4M (high-speed mode)	Microcontroller communications
+ *	RS-232		Asynchronous Serial		50-100ft						20k						Modem, Mouse, Instrumentation
+ *	RS-485		Asynchronous Serial		4000ft							10M						Data Acquisition, control systems SPI
+ *	SPI			Synchronous Serial		10ft							fPCLK/2					Sensors, EEPROM, Flash, Display
+ *
+ *
+ *	To use slave select, Master must use a GPIO pin and pull 'ss' to ground for slave to activate MOSI,MISO pins and take them out of High-Z state.
+ *
+ *	Minimal SPI Bus configuration:
+ *	The SPI bus allows the communication between one master device and one or more slave devices. In some applications SPI bus may consist of just two wires -
+ *	one for the clock signal and the other for synchronous data transfer. Other signals can be added depending on the data exchange between SPI nodes and their
+ *	slave select signal management.
+ *
+ *	SPI Hardware - Behind the Scenes:
+ *	SPI protocol uses Shift Registers on both Master and Slave side for communication.
+ *	MOSI connects the LSB of Master's shift register with MSB of Slave's shift register.
+ *	MISO connects the LSB of Slave's shift register with the MSB of Master's shift register.
+ *	Every clock cycle, both shift registers will right-shift by 1 bit. This means the  LSB of Master will be pushed to MSB of Slave, and
+ *	LSB of Slave will be pushed to MSB of Master simultaneously.
+ *
+ *						(After 1 Clock Cycle)
+ *	  ->[B0,A7,A6,A5,A4,A3,A2,A1] -MOSI-> [A0,B7,B6,B5,B4,B3,B2,B1] -
+ *	 |			Master			   					Slave			 |
+ *    -----------------------------MISO------------------------------
+ *
+ *
+ *   Customizing SPI Bus: Bus Configurations
+ *   The SPI allows the MCU to communicate using different configurations, depending on the device targeted and the app requirements.
+ *
+ *   Full-Duplex Communication:
+ *   In this config, the shift registers of the master and slave are linked using two unidirectional lines between the MOSI and the MISO pins.
+ *   During SPI communication, data is shifted synchronously on the SCK clock edges provided by the master. The master transmits the data to be sent
+ *   to the slave via the MOSI line and receives data from the slave via the MISO line. By default, the SPI is configured for Full-Duplex Communication.
+ *   (Up to 16-bit shift registers on both sides).
+ *
+ *   Half-Duplex Communication:
+ *   In this configuration, one single cross connection line is used to link the shift registers of the master and slave together. During this communication,
+ *   the data is synchronously shifted between the shift registers on the SCK clock edge in the transfer direction selected reciprocally by both master and slave.
+ *   MOSI of master has to be connected to MISO of slave here. NSS optional if only one slave. Master would be set up as transmit mode, slave as receiver mode, or vice versa.
+ *   (Up to 8-bit shift registers on both sides)
+ *
+ *	 Simplex Communication:
+ *	 Simplex single master, single slave application (master in transmit-only/slave in receive-only mode)
+ *	 Transmit-only, receive-only mode:
+ *	 The configuration settings are the same as for full-duplex. The application has to ignore the information captured on the unused input pin.
+ *	 This pin can be used as a standard GPIO.
+ *
+ *		Slave Select (NSS) Pin Management
+ *	When a device is in slave mode:
+ *	In slave mode, the NSS works as a standard 'chip select' input and lets the slave communicate with the master.
+ *
+ *	When a device is a master:
+ *	In master mode, NSS can be used either as output or input. As an input, it can prevent multi-master bus collision, and as an output it can
+ *	drive a slave select signal of a single slave.
+ *
+ *	2 Types of Slave Management:
+ *		Hardware or software slave management can be set using the SSM bit in the SPIx_CR1 register.
+ *
+ *	Hardware Slave Management
+ *		Hardware NSS management (SSM=0): NSS pin must be pulled low to activate slave to communicate with master. NSS pin must be in output mode.
+ *		The NSS pin is managed by the hardware.
+ *
+ *	Software Slave Management
+ *		Software NSS management (SSM=1): in this configuration, slave select information is driven internally by the SSI bit value in register
+ *		SPIx_CR1. The external NSS pin is free for other application uses.
+ *
+ *
+ *
+ *	Points to Remember:
+ *	Scenario 1: 1 Master 1 Slave
+ *		1) You dont need to use NSS pin of master and slave if you use software slave management.
+ *		2) If you dont want to use software slave management, then you can connect NSS of master to NSS of slave.
+ *
+ *	Scenario2: 1 master and multiple slaves
+ *		1) You cannot use software slave management here.
+ *		2) You cannot use NSS pin of the master to connect NSS pin of any of the slaves.
+ *		3) Master has to use some of its GPIO pins to control the different NSS pins of the slaves.
+ *
+ *
+ *
+ *	SPI Communication Format
+ *	SCLK Phase (CPHA), SCLK Polarity (CPOL), Data Frame Format (DFF)
+ *
+ *	. During SPI communication, receive and transmit operations are performed simultaneously.
+ *	. The serial clock (SCK) synchronizes the shifting and sampling of the information on the data lines.
+ *	. The communication format depends on the clock phase, the clock polarity and the data frame format.
+ *	  To be able to communicate together, the master and slaves devices must follow the same communication format.
+ *
+ *	CPOL(Clock Polarity)
+ *	> The CPOL (clock polarity) bit controls the idle state value of the clock when no data is being transferred.
+ *	> If CPOL is reset, the SCLK pin has a low-level idle state. If CPOL is set, the SCLK pin has a high-level idle state.
+ *
+ *	CPHA(Clock Phase)
+ *	> CPHA controls at which clock edge of the SCLK(1st or 2nd) the data should be sampled by the slave.
+ *	> The combination of CPOL (clock polarity) and CPHA (clock phase) bits selects the data capture clock edge.
+ *
+ *	4 Different SPI modes:
+ *	SPI mode 0: CPOL = 0, CPHA = 0
+ *	SPI mode 1: CPOL = 0, CPHA = 1
+ *	SPI mode 2: CPOL = 1, CPHA = 0
+ *	SPI mode 3: CPOL = 1, CPHA = 1
+ *
+ *	If CPHA = 1, Data will be sampled on the Trailing Edge of the clock
+ *	If CPHA = 0, Data will be sampled on the Leading Edge of the clock
+ *
+ *	Slave samples on MOSI and Master samples on MISO
+ *
+ *	What is the maximum SCLK speed of SPIx peripheral which can be achieved on a given microcontroller?
+ *	> First you have to know the speed of the APBx bus on which the SPI peripheral is connected.
+ *
+ *	By default, the clock signal is sourced from HSI signal (16MHZ) (other choices are HSE or PLL signals) and the APB1 bus prescalar is set to 1. The APB1 bus can support
+ *	a maximum clock speed of 42MHz. Then we have: f_pclk = 16MHz -> SPI2/SPI3 (on APB1 bus) -> min SPI prescalar = 2 -> SCLK = 8MHZ
+ *
+ *	Note: SPI1 peripheral is hanging on APB2 bus (84MHz max speed -- 2x APB1 bus!), while SPI2/3 are on APB1 bus.
+ *
+ *	So, if we use the internal RC oscillator of 16MHz as our system clock, then SPI1/SPI2/SPI3 peripherals can produce the serial clock of 8MHz maximum.
+ *
+ *	SPI Driver API Requirements:
+ *		. SPI initialization / peripheral clock control
+ *		. SPI Tx
+ *		. SPI Rx
+ *		. SPI Interrupt Config & Handling
+ *		. Other SPI Management APIs
+ *
+ *	SPIx Peripheral - Configurable Items for User Application:
+ *	SPI_DeviceMode, SPI_BusConfig, SPI_DFF, SPI_CPHA, SPI_CPOL, SPI_SSM, SPI_Speed
+ */
+
+#include "stm32f446xx_spi_driver.h"
+
+
+/* Peripheral Clock Setup */
+/* ******************************************************************************
+ * @fn					-  SPI_PClockControl
+ *
+ * @brief				-  This function enables or disables the peripheral clock
+ * 						   for the given SPI peripheral.
+ *
+ * @param[in]			-  Base address of the SPI peripheral
+ * @param[in]			-  ENABLE or DISABLE macros
+ *
+ * @return				-  none
+ *
+ * @Note				-  none
+ *
+ */
+void SPI_PClockControl(SPI_RegDef_t *pSPIx, uint8_t State) {
+
+	 //Enable peripheral clock for specified SPI peripheral 1..4
+	if(State == ENABLE) {
+
+		if(pSPIx == SPI1) {
+			SPI1_PCLK_EN();
+		}
+
+		else if(pSPIx == SPI2) {
+			SPI2_PCLK_EN();
+		}
+
+		else if(pSPIx == SPI3) {
+			SPI3_PCLK_EN();
+		}
+
+		else if(pSPIx == SPI4) {
+			SPI4_PCLK_EN();
+		}
+
+	//Disable peripheral clock for specified SPI peripheral 1..4
+	} else {
+
+		if(pSPIx == SPI1) {
+			SPI1_PCLK_DI();
+		}
+
+		else if(pSPIx == SPI2) {
+			SPI2_PCLK_DI();
+		}
+
+		else if(pSPIx == SPI3) {
+			SPI3_PCLK_DI();
+		}
+
+		else if(pSPIx == SPI4) {
+			SPI4_PCLK_DI();
+		}
+	}
+}
+
+
+/* Initialization and Deinitialization */
+/* ******************************************************************************
+ * @fn					-  SPI_Init
+ *
+ * @brief				-  Initializes SPI peripheral
+ *
+ * @param[in]			-  Base address of the SPI Handle
+ *
+ * @return				-  none
+ *
+ * @Note				-  none
+ *
+ */
+void SPI_Init(SPI_Handle_t *pSPIHandle) {
+
+	//Peripheral Clock Enable
+	SPI_PClockControl(pSPIHandle->pSPIx, ENABLE);
+
+	//1.a. Configure the SPI_CR1 register
+	uint32_t tempreg = 0;
+
+	//1.b. Configure the device mode as Master (slave is default)
+	tempreg |= (pSPIHandle->SPIConfig.SPI_DeviceMode << SPI_CR1_MSTR);
+
+	//2. Configure the bus config
+	if(pSPIHandle->SPIConfig.SPI_BusConfig == SPI_BUS_CONFIG_FD) {
+
+		//bidi mode should be cleared
+		tempreg &= ~(1 << SPI_CR1_BIDIMODE);
+
+	} else if(pSPIHandle->SPIConfig.SPI_BusConfig == SPI_BUS_CONFIG_HD) {
+
+		//bidi mode should be set
+		tempreg |= (1 << SPI_CR1_BIDIMODE);
+
+	} else if(pSPIHandle->SPIConfig.SPI_BusConfig == SPI_BUS_CONFIG_SIMPLEX_RXONLY) {
+
+		//BIDI mode should be cleared
+		tempreg &= ~(1 << SPI_CR1_BIDIMODE);
+		//RXONLY bit must be set
+		tempreg |= (1 << SPI_CR1_RXONLY);
+	}
+
+	//3. Configure the SPI Serial Clock Speed (baud rate)
+	tempreg |= (pSPIHandle->SPIConfig.SPI_SclkSpeed << SPI_CR1_BR);
+
+	//4. Configure the DFF (Data Frame Format)
+	tempreg |= (pSPIHandle->SPIConfig.SPI_DFF << SPI_CR1_DFF);
+
+	//5. Configure the CPOL (Clock Polarity)
+	tempreg |= (pSPIHandle->SPIConfig.SPI_CPOL << SPI_CR1_CPOL);
+
+	//6. Configure the CPHA (Clock Phase)
+	tempreg |= (pSPIHandle->SPIConfig.SPI_CPHA << SPI_CR1_CPHA);
+
+	pSPIHandle->pSPIx->CR1 = tempreg;
+}
+
+
+/* ******************************************************************************
+ * @fn					-  SPI_DeInit
+ *
+ * @brief				-  Deinitializes SPI peripheral
+ *
+ * @param[in]			-  Base address of the SPI peripheral
+ *
+ * @return				-  none
+ *
+ * @Note				-  none
+ *
+ */
+void SPI_DeInit(SPI_RegDef_t *pSPIx) {
+
+	if(pSPIx == SPI1) {
+		SPI1_REG_RESET();
+	}
+
+	else if(pSPIx == SPI2) {
+		SPI2_REG_RESET();
+	}
+
+	else if(pSPIx == SPI3) {
+		SPI3_REG_RESET();
+	}
+
+	else if(pSPIx == SPI4) {
+		SPI4_REG_RESET();
+	}
+}
+
+
+/* ******************************************************************************
+ * @fn					-  SPI_GetFlagStatus
+ *
+ * @brief				-  Retrieve Flag Status of SPI peripheral
+ *
+ * @param[in]			-  Base address of the SPI peripheral
+ * @param[in]			-  FlagName
+ *
+ * @return				-  Byte
+ *
+ * @Note				-  none
+ *
+ */
+uint8_t SPI_GetFlagStatus(SPI_RegDef_t *pSPIx, uint32_t FlagName) {
+
+	if(pSPIx->SR & FlagName) {
+
+		return FLAG_SET;
+	}
+
+	return FLAG_RESET;
+}
+
+/* Data Send and Receive */
+/* ******************************************************************************
+ * @fn					-  SPI_SendData
+ *
+ * @brief				-  Send Data over SPI bus
+ *
+ * @param[in]			-  Base address of the SPI peripheral
+ * @param[in]			-  pointer to tx buffer
+ * @param[in]			-  Length of data to be sent
+ *
+ * @return				-  none
+ *
+ * @Note				-  This is a blocking call.
+ *
+ */
+void SPI_SendData(SPI_RegDef_t *pSPIx, uint8_t *pTxBuffer, uint32_t Len) {
+
+	while(Len > 0) {
+
+		//1. Wait until TXE is set
+		//polling for TXE flag to be SET
+		while(SPI_GetFlagStatus(pSPIx,SPI_TXE_FLAG) == FLAG_RESET);
+
+		//2. check the DFF bit in CR1
+		if(pSPIx->CR1 & (1 << SPI_CR1_DFF)) {
+
+			//16bit DFF
+			//1. Load the data in to the DR
+			pSPIx->DR = *((uint16_t*)pTxBuffer);
+			Len--;
+			Len--;
+			(uint16_t*)pTxBuffer++;
+
+		} else {
+			//8bit DFF
+			pSPIx->DR = *pTxBuffer;
+			Len--;
+			pTxBuffer++;
+		}
+	}
+}
+
+
+/* ******************************************************************************
+ * @fn					-  SPI_ReceiveData
+ *
+ * @brief				-  Receive Data over SPI bus
+ *
+ * @param[in]			-  Base address of the SPI peripheral
+ * @param[in]			-  pointer to rx buffer
+ * @param[in]			-  Length of data to be received
+ *
+ * @return				-  none
+ *
+ * @Note				-  none
+ *
+ */
+void SPI_ReceiveData(SPI_RegDef_t *pSPIx, uint8_t *pRxBuffer, uint32_t Len) {
+
+
+}
+
+
+/* IRQ Configuration, Priority and ISR Handling */
+/* ******************************************************************************
+ * @fn					-  SPI_IRQInterruptConfig
+ *
+ * @brief				-  Configure Interrupt Request (IRQx)
+ *
+ * @param[in]			-  IRQ Number
+ * @param[in]			-  ENABLE or DISABLE macros
+ *
+ * @return				-  none
+ *
+ * @Note				-  none
+ *
+ */
+void SPI_IRQInterruptConfig(uint8_t IRQNumber, uint8_t State) {
+
+
+}
+
+
+/* ******************************************************************************
+ * @fn					-  SPI_IRQPriorityConfig
+ *
+ * @brief				-  Configure IRQ Priority
+ *
+ * @param[in]			-  IRQ Number
+ * @param[in]			-  IRQ Priority
+ *
+ * @return				-  none
+ *
+ * @Note				-  none
+ *
+ */
+void SPI_IRQPriorityConfig(uint8_t IRQNumber, uint32_t IRQPriority) {
+
+
+}
+
+
+/* ******************************************************************************
+ * @fn					-  SPI_IRQHandling
+ *
+ * @brief				-  Configure IRQ Handler for SPIx
+ *
+ * @param[in]			-  pointer to SPI handle
+ *
+ * @return				-  none
+ *
+ * @Note				-  none
+ *
+ */
+void SPI_IRQHandling(SPI_Handle_t *pHandle) {
+
+
+}
+
+/* ******************************************************************************
+ * @fn					-  SPI_PeripheralControl
+ *
+ * @brief				-  Enable or Disable SPIx peripheral
+ *
+ * @param[in]			-  Base address of the SPI peripheral
+ * @param[in]			-  ENABLE or DISABLE macros
+ *
+ * @return				-  none
+ *
+ * @Note				-  none
+ *
+ */
+void SPI_PeripheralControl(SPI_RegDef_t *pSPIx, uint8_t State) {
+
+	if(State == ENABLE) {
+
+		pSPIx->CR1 |= (1 << SPI_CR1_SPE);
+
+	} else {
+
+		pSPIx->CR1 &= ~(1 << SPI_CR1_SPE);
+	}
+}
+
+/* ******************************************************************************
+ * @fn					-  SPI_SSIConfig
+ *
+ * @brief				-  SSI (Internal Slave Select)
+ *
+ * @param[in]			-  Base address of the SPI peripheral
+ * @param[in]			-  ENABLE or DISABLE macros
+ *
+ * @return				-  none
+ *
+ * @Note				-  Forces a value onto NSS pin
+ * 					       and the IO value of the NSS pin is ignored.
+ *
+ */
+void SPI_SSIConfig(SPI_RegDef_t *pSPIx, uint8_t State) {
+
+	if(State == ENABLE) {
+
+		pSPIx->CR1 |= (1 << SPI_CR1_SSI);
+
+	} else {
+
+		 SPIx->CR1 &= ~(1 << SPI_CR1_SSI);
+	}
+}
+
+/* ******************************************************************************
+ * @fn					-  SPI_SSOEConfig
+ *
+ * @brief				-  SSOE (Slave Select Output Enable)
+ *
+ * @param[in]			-  Base address of the SPI peripheral
+ * @param[in]			-  ENABLE or DISABLE macros
+ *
+ * @return				-  none
+ *
+ * @Note				-  0: SS output is disabled in master mode and cell can work
+ * 					          in multi-master config.
+ * 					       1: SS output is enabled in master mode and when cell is enabled.
+ * 					          Cell cannot work in multi-master environment
+ */
+void SPI_SSOEConfig(SPI_RegDef_t *pSPIx, uint8_t State) {
+
+	if(State == ENABLE) {
+
+		pSPIx->CR2 |= (1 << SPI_CR2_SSOE);
+
+	} else {
+
+		pSPIx->CR2 &= ~(1 << SPI_CR2_SSOE);
+	}
+}
