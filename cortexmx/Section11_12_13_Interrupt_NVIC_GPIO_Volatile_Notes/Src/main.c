@@ -57,7 +57,7 @@ int main(void)
     	if(value) break;
     }
 
-    while(1);
+    while(1) {}
 
 	return 0;
 }

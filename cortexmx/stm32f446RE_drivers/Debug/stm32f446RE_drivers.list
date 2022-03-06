@@ -35,13 +35,13 @@ Idx Name          Size      VMA       LMA       File off  Algn
                   CONTENTS, READONLY, DEBUGGING, OCTETS
  15 .debug_ranges 00000338  00000000  00000000  000262c8  2**3
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 16 .debug_line   00002f7d  00000000  00000000  00026600  2**0
+ 16 .debug_line   00002fef  00000000  00000000  00026600  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 17 .debug_str    000012db  00000000  00000000  0002957d  2**0
+ 17 .debug_str    000012ee  00000000  00000000  000295ef  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 18 .comment      00000053  00000000  00000000  0002a858  2**0
+ 18 .comment      00000053  00000000  00000000  0002a8dd  2**0
                   CONTENTS, READONLY
- 19 .debug_frame  0000149c  00000000  00000000  0002a8ac  2**2
+ 19 .debug_frame  0000149c  00000000  00000000  0002a930  2**2
                   CONTENTS, READONLY, DEBUGGING, OCTETS
 
 Disassembly of section .text:
@@ -582,7 +582,7 @@ void SysTick_Handler(void) {
  80004fc:	4b21      	ldr	r3, [pc, #132]	; (8000584 <SysTick_Handler+0xa8>)
  80004fe:	60fb      	str	r3, [r7, #12]
 #ifndef PRINT_LCD
-		printf("Current time = %s %s\n", time_to_string(&current_time), am_pm); // 04:25:41 PM
+		printf("Current time = %s %s\n", time_to_string(&current_time), am_pm); // 11:59:30 PM
 #else
 		lcd_set_cursor(1, 1);
  8000500:	2101      	movs	r1, #1
@@ -602,7 +602,7 @@ void SysTick_Handler(void) {
 
 	} else {
 #ifndef PRINT_LCD
-		printf("Current time = %s\n", time_to_string(&current_time)); // 04:25:41
+		printf("Current time = %s\n", time_to_string(&current_time)); // 11:59:30
 #else
 		lcd_set_cursor(1, 1);
  8000522:	2101      	movs	r1, #1

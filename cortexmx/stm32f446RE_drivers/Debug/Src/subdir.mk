@@ -21,10 +21,13 @@ C_DEPS += \
 
 
 # Each subdirectory must supply rules for building sources it contributes
-Src/015rtc_lcd.o: ../Src/015rtc_lcd.c Src/subdir.mk
-	arm-none-eabi-gcc "$<" -mcpu=cortex-m4 -std=gnu11 -g -DSTM32 -DSTM32F4 -DSTM32F446RETx -DDEBUG -DNUCLEO_F446RE -c -I../Inc -I"C:/Users/Oliver/Desktop/FastBit Embedded Brain Academy/Master Microcontroller and Embedded Driver Development (MCU1)/cortexmx/stm32f446RE_drivers/drivers/inc" -I"C:/Users/Oliver/Desktop/FastBit Embedded Brain Academy/Master Microcontroller and Embedded Driver Development (MCU1)/cortexmx/stm32f446RE_drivers/bsp" -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -MMD -MP -MF"Src/015rtc_lcd.d" -MT"$@" --specs=nano.specs -mfloat-abi=soft -mthumb -o "$@"
-Src/syscalls.o: ../Src/syscalls.c Src/subdir.mk
-	arm-none-eabi-gcc "$<" -mcpu=cortex-m4 -std=gnu11 -g -DSTM32 -DSTM32F4 -DSTM32F446RETx -DDEBUG -DNUCLEO_F446RE -c -I../Inc -I"C:/Users/Oliver/Desktop/FastBit Embedded Brain Academy/Master Microcontroller and Embedded Driver Development (MCU1)/cortexmx/stm32f446RE_drivers/drivers/inc" -I"C:/Users/Oliver/Desktop/FastBit Embedded Brain Academy/Master Microcontroller and Embedded Driver Development (MCU1)/cortexmx/stm32f446RE_drivers/bsp" -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -MMD -MP -MF"Src/syscalls.d" -MT"$@" --specs=nano.specs -mfloat-abi=soft -mthumb -o "$@"
-Src/sysmem.o: ../Src/sysmem.c Src/subdir.mk
-	arm-none-eabi-gcc "$<" -mcpu=cortex-m4 -std=gnu11 -g -DSTM32 -DSTM32F4 -DSTM32F446RETx -DDEBUG -DNUCLEO_F446RE -c -I../Inc -I"C:/Users/Oliver/Desktop/FastBit Embedded Brain Academy/Master Microcontroller and Embedded Driver Development (MCU1)/cortexmx/stm32f446RE_drivers/drivers/inc" -I"C:/Users/Oliver/Desktop/FastBit Embedded Brain Academy/Master Microcontroller and Embedded Driver Development (MCU1)/cortexmx/stm32f446RE_drivers/bsp" -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -MMD -MP -MF"Src/sysmem.d" -MT"$@" --specs=nano.specs -mfloat-abi=soft -mthumb -o "$@"
+Src/%.o: ../Src/%.c Src/subdir.mk
+	arm-none-eabi-gcc "$<" -mcpu=cortex-m4 -std=gnu11 -g -DSTM32 -DSTM32F4 -DSTM32F446RETx -DDEBUG -DNUCLEO_F446RE -c -I../Inc -I"C:/Users/Oliver/Desktop/FastBit Embedded Brain Academy/CubeIDE Workspaces/Master Microcontroller and Embedded Driver Development (MCU1)/cortexmx/stm32f446RE_drivers/drivers/inc" -I"C:/Users/Oliver/Desktop/FastBit Embedded Brain Academy/CubeIDE Workspaces/Master Microcontroller and Embedded Driver Development (MCU1)/cortexmx/stm32f446RE_drivers/bsp" -O0 -ffunction-sections -fdata-sections -Wall -fstack-usage -MMD -MP -MF"$(@:%.o=%.d)" -MT"$@" --specs=nano.specs -mfloat-abi=soft -mthumb -o "$@"
+
+clean: clean-Src
+
+clean-Src:
+	-$(RM) ./Src/015rtc_lcd.d ./Src/015rtc_lcd.o ./Src/syscalls.d ./Src/syscalls.o ./Src/sysmem.d ./Src/sysmem.o
+
+.PHONY: clean-Src
 

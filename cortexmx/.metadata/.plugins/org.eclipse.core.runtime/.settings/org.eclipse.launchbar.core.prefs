@@ -1,9 +1,9 @@
 LaunchTargetManager/org.eclipse.launchbar.core.launchTargetType.local,Local/arch=x86_64
 LaunchTargetManager/org.eclipse.launchbar.core.launchTargetType.local,Local/name=Local
 LaunchTargetManager/org.eclipse.launchbar.core.launchTargetType.local,Local/os=win32
-configDescList=org.eclipse.cdt.dsf.gdb.gdbRemotedescriptorType\:stm32f446RE_drivers
+configDescList=org.eclipse.cdt.dsf.gdb.gdbRemotedescriptorType\:Section05_HelloWorldSemiHosting Debug,org.eclipse.cdt.dsf.gdb.gdbRemotedescriptorType\:Section05_HelloWorldSemiHosting,org.eclipse.cdt.dsf.gdb.gdbRemotedescriptorType\:Section06_Debug_Tips_and_Tricks Debug,org.eclipse.cdt.dsf.gdb.gdbRemotedescriptorType\:Section06_Debug_Tips_and_Tricks,org.eclipse.cdt.dsf.gdb.gdbRemotedescriptorType\:Section10_MCU_Clock_Exercise_HSI_measurement,org.eclipse.cdt.dsf.gdb.gdbRemotedescriptorType\:stm32f446RE_drivers,org.eclipse.cdt.dsf.gdb.gdbRemotedescriptorType\:Section05_HelloWorld
 eclipse.preferences.version=1
-org.eclipse.cdt.dsf.gdb.gdbRemotedescriptorType\:Section05_HelloWorld/activeLaunchMode=debug
+org.eclipse.cdt.dsf.gdb.gdbRemotedescriptorType\:Section05_HelloWorld/activeLaunchMode=run
 org.eclipse.cdt.dsf.gdb.gdbRemotedescriptorType\:Section05_HelloWorld/activeLaunchTarget=null\:---
 org.eclipse.cdt.dsf.gdb.gdbRemotedescriptorType\:Section05_HelloWorldSemiHosting/activeLaunchTarget=null\:---
 org.eclipse.cdt.dsf.gdb.gdbRemotedescriptorType\:Section06_Debug_Tips_and_Tricks/activeLaunchTarget=null\:---
